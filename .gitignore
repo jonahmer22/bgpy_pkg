@@ -1,5 +1,8 @@
 .ruff_cache/
 
+# MacOS Metadata
+.DS_Store
+
 # Test generates these automatically
 *guess.csv
 *guess.pickle
