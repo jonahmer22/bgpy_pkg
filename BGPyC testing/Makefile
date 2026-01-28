@@ -1,6 +1,6 @@
 package:
 	python3 -m pip install -e .
-	mv bgpyc.cpython-313-darwin.so bgpyc.so
+	mv bgpyc.cpython* bgpyc.so
 
 test:
 	python3 ./test_bgpyc.py
