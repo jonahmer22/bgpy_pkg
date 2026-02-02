@@ -62,5 +62,5 @@ if __name__ == "__main__":
     ps.print_stats()
 
     # Write the profiling results to a file
-    with open('/home/anon/Desktop/profile_output.txt', 'w') as f:
+    with open('~/Desktop/profile_output.txt', 'w') as f:
         f.write(s.getvalue())
