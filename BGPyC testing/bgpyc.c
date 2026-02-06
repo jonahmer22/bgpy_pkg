@@ -71,6 +71,24 @@ static PyObject *AS_repr(ASObject *self) {
     return PyUnicode_FromFormat("<bgpyc.AS asn=%u counter=%lu>", self->asn, self->counter);
 }
 
+static int method_is_overridden(PyObject *obj, const char *name) {
+    PyObject *type_attr = PyObject_GetAttrString((PyObject *)Py_TYPE(obj), name);
+    if (!type_attr) {
+        PyErr_Clear();
+        return 1;
+    }
+    PyObject *base_attr = PyObject_GetAttrString((PyObject *)&ASType, name);
+    if (!base_attr) {
+        PyErr_Clear();
+        Py_DECREF(type_attr);
+        return 1;
+    }
+    int same = (type_attr == base_attr);
+    Py_DECREF(type_attr);
+    Py_DECREF(base_attr);
+    return !same;
+}
+
 /* Methods on the type */
 static PyMethodDef AS_methods[] = {
     {"step", (PyCFunction)AS_step, METH_NOARGS, "Advance one simulation step (C fast-path)."},
@@ -100,17 +118,92 @@ static PyTypeObject ASType = {
 /*
  * Hybrid dispatch hook:
  * - exact bgpyc.AS => call the C implementation directly (fast)
- * - subclass/other => call obj.step() (allows Python override)
+ * - subclass => call C if not overridden, else obj.step()
+ * - other => call obj.step()
  */
 static PyObject *call_step(PyObject *Py_UNUSED(self), PyObject *obj) {
-    if (PyObject_TypeCheck(obj, &ASType) && Py_TYPE(obj) == &ASType) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "step")) {
         return AS_step((ASObject *)obj, NULL);
     }
     return PyObject_CallMethod(obj, "step", NULL);
 }
 
+static PyObject *call_method_a(PyObject *Py_UNUSED(self), PyObject *obj) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "method_a")) {
+        return AS_method_a((ASObject *)obj, NULL);
+    }
+    return PyObject_CallMethod(obj, "method_a", NULL);
+}
+
+static PyObject *call_method_b(PyObject *Py_UNUSED(self), PyObject *args) {
+    PyObject *obj = NULL;
+    const char *msg = NULL;
+    if (!PyArg_ParseTuple(args, "Os", &obj, &msg)) {
+        return NULL;
+    }
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "method_b")) {
+        PyObject *method_args = Py_BuildValue("(s)", msg);
+        if (!method_args) return NULL;
+        PyObject *result = AS_method_b((ASObject *)obj, method_args);
+        Py_DECREF(method_args);
+        return result;
+    }
+    return PyObject_CallMethod(obj, "method_b", "s", msg);
+}
+
+static PyObject *call_method_c(PyObject *Py_UNUSED(self), PyObject *obj) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "method_c")) {
+        return AS_method_c((ASObject *)obj, NULL);
+    }
+    return PyObject_CallMethod(obj, "method_c", NULL);
+}
+
+static PyObject *call_bump(PyObject *Py_UNUSED(self), PyObject *args) {
+    PyObject *obj = NULL;
+    unsigned long delta = 0;
+    if (!PyArg_ParseTuple(args, "Ok", &obj, &delta)) {
+        return NULL;
+    }
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "bump")) {
+        PyObject *method_args = Py_BuildValue("(k)", delta);
+        if (!method_args) return NULL;
+        PyObject *result = AS_bump((ASObject *)obj, method_args);
+        Py_DECREF(method_args);
+        return result;
+    }
+    return PyObject_CallMethod(obj, "bump", "k", delta);
+}
+
+static PyObject *call_reset(PyObject *Py_UNUSED(self), PyObject *obj) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "reset")) {
+        return AS_reset((ASObject *)obj, NULL);
+    }
+    return PyObject_CallMethod(obj, "reset", NULL);
+}
+
+static PyObject *call_get_asn(PyObject *Py_UNUSED(self), PyObject *obj) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "get_asn")) {
+        return AS_get_asn((ASObject *)obj, NULL);
+    }
+    return PyObject_CallMethod(obj, "get_asn", NULL);
+}
+
+static PyObject *call_get_counter(PyObject *Py_UNUSED(self), PyObject *obj) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "get_counter")) {
+        return AS_get_counter((ASObject *)obj, NULL);
+    }
+    return PyObject_CallMethod(obj, "get_counter", NULL);
+}
+
 static PyMethodDef module_methods[] = {
     {"call_step", (PyCFunction)call_step, METH_O, "Call obj.step() with a fast-path for exact bgpyc.AS."},
+    {"call_method_a", (PyCFunction)call_method_a, METH_O, "Call obj.method_a() with a fast-path when not overridden."},
+    {"call_method_b", (PyCFunction)call_method_b, METH_VARARGS, "Call obj.method_b(msg) with a fast-path when not overridden."},
+    {"call_method_c", (PyCFunction)call_method_c, METH_O, "Call obj.method_c() with a fast-path when not overridden."},
+    {"call_bump", (PyCFunction)call_bump, METH_VARARGS, "Call obj.bump(delta) with a fast-path when not overridden."},
+    {"call_reset", (PyCFunction)call_reset, METH_O, "Call obj.reset() with a fast-path when not overridden."},
+    {"call_get_asn", (PyCFunction)call_get_asn, METH_O, "Call obj.get_asn() with a fast-path when not overridden."},
+    {"call_get_counter", (PyCFunction)call_get_counter, METH_O, "Call obj.get_counter() with a fast-path when not overridden."},
     {NULL, NULL, 0, NULL}
 };
 
