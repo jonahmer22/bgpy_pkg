@@ -1,3 +1,5 @@
+# mirror implementation of bgpyc.c
+# only used for testing function call time of C vs pure python
 class AS:
     def __init__(self, asn: int):
         self.asn = int(asn)

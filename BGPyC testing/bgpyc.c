@@ -1,3 +1,6 @@
+// proof of concept
+// only for validating basic functions (inheretance, runtime, function call time)
+// use as a blueprint for actual implementations (start with Graph nodes)
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
