@@ -10,6 +10,9 @@ typedef struct {
     unsigned long counter;
 } ASObject;
 
+// forgot this
+static PyTypeObject ASType;
+
 static PyObject *AS_step(ASObject *self, PyObject *Py_UNUSED(ignored)) {
     self->counter += 1;
     return PyLong_FromUnsignedLong(self->counter);
@@ -71,8 +74,26 @@ static PyObject *AS_repr(ASObject *self) {
     return PyUnicode_FromFormat("<bgpyc.AS asn=%u counter=%lu>", self->asn, self->counter);
 }
 
-static int method_is_overridden(PyObject *obj, const char *name) {
-    PyObject *type_attr = PyObject_GetAttrString((PyObject *)Py_TYPE(obj), name);
+// caches whether methods are overriden.
+// NOTE: breaks monkey patching (personally don't like it anyway, but it breaks it)
+static int method_is_overridden_cached(PyObject *obj, const char *name, const char *cache_key) {
+    PyObject *type = (PyObject *)Py_TYPE(obj);
+
+    // Exact type: never overridden
+    if (type == (PyObject *)&ASType) {
+        return 0;
+    }
+
+    // a object holds whether it was cached or not as an attribute
+    PyObject *cached = PyObject_GetAttrString(type, cache_key);
+    if (cached) {
+        int overridden = PyObject_IsTrue(cached);
+        Py_DECREF(cached);
+        return overridden;
+    }
+    PyErr_Clear();  // if there wasn't one it errors, but that's not really an error
+
+    PyObject *type_attr = PyObject_GetAttrString(type, name);
     if (!type_attr) {
         PyErr_Clear();
         return 1;
@@ -83,10 +104,18 @@ static int method_is_overridden(PyObject *obj, const char *name) {
         Py_DECREF(type_attr);
         return 1;
     }
-    int same = (type_attr == base_attr);
+    int overridden = (type_attr != base_attr);
     Py_DECREF(type_attr);
     Py_DECREF(base_attr);
-    return !same;
+
+    PyObject *flag = overridden ? Py_True : Py_False;
+    Py_INCREF(flag);
+    if (PyObject_SetAttrString(type, cache_key, flag) < 0) {
+        PyErr_Clear();
+    }
+    Py_DECREF(flag);
+
+    return overridden;
 }
 
 /* Methods on the type */
@@ -99,7 +128,7 @@ static PyMethodDef AS_methods[] = {
     {"reset", (PyCFunction)AS_reset, METH_NOARGS, "Reset counter to zero."},
     {"get_asn", (PyCFunction)AS_get_asn, METH_NOARGS, "Return the ASN."},
     {"get_counter", (PyCFunction)AS_get_counter, METH_NOARGS, "Return the counter."},
-    {NULL, NULL, 0, NULL}
+    {NULL, NULL, 0, NULL}   // used as an end of list item in python
 };
 
 static PyTypeObject ASType = {
@@ -122,14 +151,14 @@ static PyTypeObject ASType = {
  * - other => call obj.step()
  */
 static PyObject *call_step(PyObject *Py_UNUSED(self), PyObject *obj) {
-    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "step")) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden_cached(obj, "step", "__bgpyc_override_step")) {
         return AS_step((ASObject *)obj, NULL);
     }
     return PyObject_CallMethod(obj, "step", NULL);
 }
 
 static PyObject *call_method_a(PyObject *Py_UNUSED(self), PyObject *obj) {
-    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "method_a")) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden_cached(obj, "method_a", "__bgpyc_override_method_a")) {
         return AS_method_a((ASObject *)obj, NULL);
     }
     return PyObject_CallMethod(obj, "method_a", NULL);
@@ -141,7 +170,7 @@ static PyObject *call_method_b(PyObject *Py_UNUSED(self), PyObject *args) {
     if (!PyArg_ParseTuple(args, "Os", &obj, &msg)) {
         return NULL;
     }
-    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "method_b")) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden_cached(obj, "method_b", "__bgpyc_override_method_b")) {
         PyObject *method_args = Py_BuildValue("(s)", msg);
         if (!method_args) return NULL;
         PyObject *result = AS_method_b((ASObject *)obj, method_args);
@@ -152,7 +181,7 @@ static PyObject *call_method_b(PyObject *Py_UNUSED(self), PyObject *args) {
 }
 
 static PyObject *call_method_c(PyObject *Py_UNUSED(self), PyObject *obj) {
-    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "method_c")) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden_cached(obj, "method_c", "__bgpyc_override_method_c")) {
         return AS_method_c((ASObject *)obj, NULL);
     }
     return PyObject_CallMethod(obj, "method_c", NULL);
@@ -164,7 +193,7 @@ static PyObject *call_bump(PyObject *Py_UNUSED(self), PyObject *args) {
     if (!PyArg_ParseTuple(args, "Ok", &obj, &delta)) {
         return NULL;
     }
-    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "bump")) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden_cached(obj, "bump", "__bgpyc_override_bump")) {
         PyObject *method_args = Py_BuildValue("(k)", delta);
         if (!method_args) return NULL;
         PyObject *result = AS_bump((ASObject *)obj, method_args);
@@ -175,21 +204,21 @@ static PyObject *call_bump(PyObject *Py_UNUSED(self), PyObject *args) {
 }
 
 static PyObject *call_reset(PyObject *Py_UNUSED(self), PyObject *obj) {
-    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "reset")) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden_cached(obj, "reset", "__bgpyc_override_reset")) {
         return AS_reset((ASObject *)obj, NULL);
     }
     return PyObject_CallMethod(obj, "reset", NULL);
 }
 
 static PyObject *call_get_asn(PyObject *Py_UNUSED(self), PyObject *obj) {
-    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "get_asn")) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden_cached(obj, "get_asn", "__bgpyc_override_get_asn")) {
         return AS_get_asn((ASObject *)obj, NULL);
     }
     return PyObject_CallMethod(obj, "get_asn", NULL);
 }
 
 static PyObject *call_get_counter(PyObject *Py_UNUSED(self), PyObject *obj) {
-    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden(obj, "get_counter")) {
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden_cached(obj, "get_counter", "__bgpyc_override_get_counter")) {
         return AS_get_counter((ASObject *)obj, NULL);
     }
     return PyObject_CallMethod(obj, "get_counter", NULL);
