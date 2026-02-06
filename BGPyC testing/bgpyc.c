@@ -12,6 +12,47 @@ static PyObject *AS_step(ASObject *self, PyObject *Py_UNUSED(ignored)) {
     return PyLong_FromUnsignedLong(self->counter);
 }
 
+static PyObject *AS_method_a(ASObject *Py_UNUSED(self), PyObject *Py_UNUSED(ignored)) {
+    PySys_WriteStdout("in method A\n");
+    Py_RETURN_NONE;
+}
+
+static PyObject *AS_method_b(ASObject *Py_UNUSED(self), PyObject *args) {
+    const char *msg = NULL;
+    if (!PyArg_ParseTuple(args, "s", &msg)) {
+        return NULL;
+    }
+    PySys_WriteStdout("in method B: %s\n", msg);
+    Py_RETURN_NONE;
+}
+
+static PyObject *AS_method_c(ASObject *Py_UNUSED(self), PyObject *Py_UNUSED(ignored)) {
+    PySys_WriteStdout("in method C\n");
+    Py_RETURN_NONE;
+}
+
+static PyObject *AS_bump(ASObject *self, PyObject *args) {
+    unsigned long delta = 0;
+    if (!PyArg_ParseTuple(args, "k", &delta)) {
+        return NULL;
+    }
+    self->counter += delta;
+    return PyLong_FromUnsignedLong(self->counter);
+}
+
+static PyObject *AS_reset(ASObject *self, PyObject *Py_UNUSED(ignored)) {
+    self->counter = 0;
+    Py_RETURN_NONE;
+}
+
+static PyObject *AS_get_asn(ASObject *self, PyObject *Py_UNUSED(ignored)) {
+    return PyLong_FromUnsignedLong(self->asn);
+}
+
+static PyObject *AS_get_counter(ASObject *self, PyObject *Py_UNUSED(ignored)) {
+    return PyLong_FromUnsignedLong(self->counter);
+}
+
 static int AS_init(ASObject *self, PyObject *args, PyObject *kwds) {
     static char *kwlist[] = {"asn", NULL};
     unsigned int asn = 0;
@@ -30,6 +71,13 @@ static PyObject *AS_repr(ASObject *self) {
 /* Methods on the type */
 static PyMethodDef AS_methods[] = {
     {"step", (PyCFunction)AS_step, METH_NOARGS, "Advance one simulation step (C fast-path)."},
+    {"method_a", (PyCFunction)AS_method_a, METH_NOARGS, "Print a test message (method A)."},
+    {"method_b", (PyCFunction)AS_method_b, METH_VARARGS, "Print a test message (method B)."},
+    {"method_c", (PyCFunction)AS_method_c, METH_NOARGS, "Print a test message (method C)."},
+    {"bump", (PyCFunction)AS_bump, METH_VARARGS, "Increment counter by a delta."},
+    {"reset", (PyCFunction)AS_reset, METH_NOARGS, "Reset counter to zero."},
+    {"get_asn", (PyCFunction)AS_get_asn, METH_NOARGS, "Return the ASN."},
+    {"get_counter", (PyCFunction)AS_get_counter, METH_NOARGS, "Return the counter."},
     {NULL, NULL, 0, NULL}
 };
 
