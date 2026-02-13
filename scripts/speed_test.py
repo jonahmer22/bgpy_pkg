@@ -62,5 +62,6 @@ if __name__ == "__main__":
     ps.print_stats()
 
     # Write the profiling results to a file
-    with open('~/Desktop/profile_output.txt', 'w') as f:
-        f.write(s.getvalue())
+    profile_output_path = Path("~/Desktop/speed_test/profile_output.txt").expanduser()
+    profile_output_path.parent.mkdir(parents=True, exist_ok=True)
+    profile_output_path.write_text(s.getvalue())

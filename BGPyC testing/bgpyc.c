@@ -18,6 +18,19 @@ static PyObject *AS_step(ASObject *self, PyObject *Py_UNUSED(ignored)) {
     return PyLong_FromUnsignedLong(self->counter);
 }
 
+static PyObject *AS_step_n_raw(ASObject *self, unsigned long n) {
+    self->counter += n;
+    return PyLong_FromUnsignedLong(self->counter);
+}
+
+static PyObject *AS_step_n(ASObject *self, PyObject *args) {
+    unsigned long n = 0;
+    if (!PyArg_ParseTuple(args, "k", &n)) {
+        return NULL;
+    }
+    return AS_step_n_raw(self, n);
+}
+
 static PyObject *AS_method_a(ASObject *Py_UNUSED(self), PyObject *Py_UNUSED(ignored)) {
     PySys_WriteStdout("in method A\n");
     Py_RETURN_NONE;
@@ -121,6 +134,7 @@ static int method_is_overridden_cached(PyObject *obj, const char *name, const ch
 /* Methods on the type */
 static PyMethodDef AS_methods[] = {
     {"step", (PyCFunction)AS_step, METH_NOARGS, "Advance one simulation step (C fast-path)."},
+    {"step_n", (PyCFunction)AS_step_n, METH_VARARGS, "Advance n simulation steps (C loop)."},
     {"method_a", (PyCFunction)AS_method_a, METH_NOARGS, "Print a test message (method A)."},
     {"method_b", (PyCFunction)AS_method_b, METH_VARARGS, "Print a test message (method B)."},
     {"method_c", (PyCFunction)AS_method_c, METH_NOARGS, "Print a test message (method C)."},
@@ -136,7 +150,7 @@ static PyTypeObject ASType = {
     .tp_name = "bgpyc.AS",
     .tp_basicsize = sizeof(ASObject),
     .tp_itemsize = 0,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* IMPORTANT: allows subclassing */
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,   // IMPORTANT: allows subclassing
     .tp_doc = "C-defined AS object (subclassable).",
     .tp_methods = AS_methods,
     .tp_init = (initproc)AS_init,
@@ -151,10 +165,28 @@ static PyTypeObject ASType = {
  * - other => call obj.step()
  */
 static PyObject *call_step(PyObject *Py_UNUSED(self), PyObject *obj) {
+    if (Py_TYPE(obj) == &ASType) {
+        return AS_step((ASObject *)obj, NULL);
+    }
     if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden_cached(obj, "step", "__bgpyc_override_step")) {
         return AS_step((ASObject *)obj, NULL);
     }
     return PyObject_CallMethod(obj, "step", NULL);
+}
+
+static PyObject *call_step_n(PyObject *Py_UNUSED(self), PyObject *args) {
+    PyObject *obj = NULL;
+    unsigned long n = 0;
+    if (!PyArg_ParseTuple(args, "Ok", &obj, &n)) {
+        return NULL;
+    }
+    if (Py_TYPE(obj) == &ASType) {
+        return AS_step_n_raw((ASObject *)obj, n);
+    }
+    if (PyObject_TypeCheck(obj, &ASType) && !method_is_overridden_cached(obj, "step_n", "__bgpyc_override_step_n")) {
+        return AS_step_n_raw((ASObject *)obj, n);
+    }
+    return PyObject_CallMethod(obj, "step_n", "k", n);
 }
 
 static PyObject *call_method_a(PyObject *Py_UNUSED(self), PyObject *obj) {
@@ -226,6 +258,7 @@ static PyObject *call_get_counter(PyObject *Py_UNUSED(self), PyObject *obj) {
 
 static PyMethodDef module_methods[] = {
     {"call_step", (PyCFunction)call_step, METH_O, "Call obj.step() with a fast-path for exact bgpyc.AS."},
+    {"call_step_n", (PyCFunction)call_step_n, METH_VARARGS, "Call obj.step_n(n) with a fast-path when not overridden."},
     {"call_method_a", (PyCFunction)call_method_a, METH_O, "Call obj.method_a() with a fast-path when not overridden."},
     {"call_method_b", (PyCFunction)call_method_b, METH_VARARGS, "Call obj.method_b(msg) with a fast-path when not overridden."},
     {"call_method_c", (PyCFunction)call_method_c, METH_O, "Call obj.method_c() with a fast-path when not overridden."},

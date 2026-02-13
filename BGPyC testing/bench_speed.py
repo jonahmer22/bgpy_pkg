@@ -23,12 +23,13 @@ def main():
 
     # Warm up
     for _ in range(1000):
-        c_as.step()
+        # c_as.step()
         py_as.step()
 
     print(f"loops: {args.loops}")
     bench("bgpyc step", c_as.step, args.loops)
     bench("bgpyc call_step", lambda: bgpyc.call_step(c_as), args.loops)
+    bench("bgpyc call_step_n (C loop)", lambda: bgpyc.call_step_n(c_as, args.loops), 1)
     bench("bgpyp step", py_as.step, args.loops)
     bench("bgpyp call_step", lambda: bgpyp.call_step(py_as), args.loops)
 
