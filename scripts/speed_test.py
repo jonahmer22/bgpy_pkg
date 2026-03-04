@@ -1,4 +1,3 @@
-import cProfile
 import io
 import pstats
 import time
@@ -40,8 +39,6 @@ def main():
 
 if __name__ == "__main__":
     start = time.perf_counter()
-    profiler = cProfile.Profile()
-    profiler.enable()
     main()
     print(f"{time.perf_counter() - start:.2f}s")
     # v9 Normal 61.6s
@@ -49,18 +46,16 @@ if __name__ == "__main__":
     # v9 again only 63.88s
     # CIBUILDWHEEL=1 pip install frozendict - 64s
     # After removing 5% info tag from announcements
-    profiler.disable()
 
     # Create a StringIO object to capture the profiling results
     s = io.StringIO()
 
     # Create a Stats object with the profiling results
-    sortby = 'cumtime'
-    ps = pstats.Stats(profiler, stream=s).sort_stats(sortby)
 
     # Print the profiling results to the StringIO object
-    ps.print_stats()
 
     # Write the profiling results to a file
-    with open('/home/anon/Desktop/profile_output.txt', 'w') as f:
+    profile_output_path = Path("~/Desktop/profile_output.txt").expanduser()
+    profile_output_path.parent.mkdir(parents=True, exist_ok=True)
+    with profile_output_path.open("w") as f:
         f.write(s.getvalue())
