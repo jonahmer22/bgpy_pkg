@@ -1,6 +1,5 @@
 include README.md
 include LICENSE.txt
-include bgpy/simulation_engine/_announcement_c.c
 global-include **.typed
 global-include **.pyi
 include tox.ini

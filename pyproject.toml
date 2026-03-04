@@ -95,10 +95,18 @@ test = [
 
 [tool.setuptools]
 include-package-data = true
+# added ext-modules to include C extensions
+ext-modules = [
+    {name = "bgpy.simulation_engine._announcement_c", sources = ["bgpy/simulation_engine/_announcement_c.c"]},
+]
 
 # https://stackoverflow.com/a/76214408/8903959
 [tool.setuptools.package-data]
-bgpy = ["py.typed"]
+bgpy = [
+    "py.typed",
+    "simulation_engine/_announcement_c.c",
+    "simulation_engine/policies/bgp/bgp/bgp.pyi",
+]
 
 # https://stackoverflow.com/a/76214408/8903959
 [tool.setuptools.packages.find]
