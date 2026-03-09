@@ -41,21 +41,3 @@ if __name__ == "__main__":
     start = time.perf_counter()
     main()
     print(f"{time.perf_counter() - start:.2f}s")
-    # v9 Normal 61.6s
-    # v8 68.53s
-    # v9 again only 63.88s
-    # CIBUILDWHEEL=1 pip install frozendict - 64s
-    # After removing 5% info tag from announcements
-
-    # Create a StringIO object to capture the profiling results
-    s = io.StringIO()
-
-    # Create a Stats object with the profiling results
-
-    # Print the profiling results to the StringIO object
-
-    # Write the profiling results to a file
-    profile_output_path = Path("~/Desktop/profile_output.txt").expanduser()
-    profile_output_path.parent.mkdir(parents=True, exist_ok=True)
-    with profile_output_path.open("w") as f:
-        f.write(s.getvalue())
