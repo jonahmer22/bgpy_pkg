@@ -525,6 +525,161 @@ static PyObject *Announcement_get_origin(AnnouncementObject *self, void *Py_UNUS
     return PySequence_GetItem(self->as_path, -1);
 }
 
+// === optional things for testing need yaml ===
+
+// ######################
+// # Yaml Functionality #
+// ######################
+
+/* 
+ * returns a python dict of all the attributes and stuff of an announcement
+ * This optional method is called when you call yaml.dump()
+ * equivelent to `__to_yaml_dict__(self) -> dict[str, Any]`
+ */
+static PyObject *Announcement_to_yaml_dict(AnnouncementObject *self, PyObject *Py_UNUSED(ignored)) {
+    // create a new python dict as return value
+    PyObject *out = PyDict_New();
+    if (!out) {
+        // if creating the dict failed return
+        return NULL;
+    }
+
+    // add all values from self to dict along with string labels
+    if (PyDict_SetItemString(out, "prefix", self->prefix) < 0 ||
+        PyDict_SetItemString(out, "as_path", self->as_path) < 0 ||
+        PyDict_SetItemString(out, "next_hop_asn", self->next_hop_asn) < 0 ||
+        PyDict_SetItemString(out, "seed_asn", self->seed_asn) < 0 ||
+        PyDict_SetItemString(out, "recv_relationship", self->recv_relationship) < 0 ||
+        PyDict_SetItemString(out, "timestamp", self->timestamp) < 0 ||
+        PyDict_SetItemString(out, "withdraw", self->withdraw) < 0 ||
+        PyDict_SetItemString(out, "bgpsec_next_asn", self->bgpsec_next_asn) < 0 ||
+        PyDict_SetItemString(out, "bgpsec_as_path", self->bgpsec_as_path) < 0 ||
+        PyDict_SetItemString(out, "only_to_customers", self->only_to_customers) < 0 ||
+        PyDict_SetItemString(out, "rovpp_blackhole", self->rovpp_blackhole) < 0) {
+        // if that fails decref and exit
+        Py_DECREF(out);
+        return NULL;
+    }
+
+    // return the final result dict
+    return out;
+}
+
+/* 
+ * calls `cls(**dct)` just does python call tbh
+ * This optional method is called when you call yaml.load()
+ * equivelent to `__from_yaml_dict__`
+ */
+static PyObject *Announcement_from_yaml_dict(PyObject *cls, PyObject *args, PyObject *kwargs) {
+    static char *kwlist[] = {"dct", "yaml_tag", NULL};
+    PyObject *dct = NULL;
+    PyObject *yaml_tag = Py_None;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", kwlist, &dct, &yaml_tag)) {
+        return NULL;
+    }
+    if (!PyDict_Check(dct)) {
+        PyErr_SetString(PyExc_TypeError, "dct must be a dict");
+        return NULL;
+    }
+    return PyObject_Call(cls, empty_tuple_singleton, dct);
+}
+
+// ############################
+// # Depricated Functionality #
+// ############################
+
+// Note: I still included these for the sake of it, they still warn like they did in python
+
+/* 
+ * returns a Py_True or Py_False based on equivelece of prefic and as_path
+ * Checks prefix and as path equivalency
+ * equivelent to `prefix_path_attributes_eq(self, ann: Optional["Announcement"]) -> bool`
+ */
+static PyObject *Announcement_prefix_path_attributes_eq(
+    AnnouncementObject *self,
+    PyObject *ann
+) {
+    // create a message for deprication warning
+    const char *msg =
+        "Please use (ann.prefix, ann.as_path) == (self.prefix, self.as_path) "
+        "instead of ._ribs_out. This will be removed in a later version";
+
+    // send deprication warning
+    if (PyErr_WarnEx(PyExc_DeprecationWarning, msg, 2) < 0) {
+        return NULL;
+    }
+
+    // if the other object is None then return false
+    if (ann == Py_None) {
+        Py_RETURN_FALSE;
+    }
+
+    // if the other object is an announcement
+    if (PyObject_TypeCheck(ann, &AnnouncementType)) {
+        // cast it as an announcement
+        AnnouncementObject *other = (AnnouncementObject *)ann;
+        // compare prefixes
+        int eq_prefix = PyObject_RichCompareBool(self->prefix, other->prefix, Py_EQ);
+        if (eq_prefix < 0) {
+            return NULL;    // < 0 would signify an error in comparison so return
+        }
+        if (!eq_prefix) {   // = 0 would be false
+            Py_RETURN_FALSE;
+        }
+        // compare as_paths
+        int eq_path = PyObject_RichCompareBool(self->as_path, other->as_path, Py_EQ);
+        if (eq_path < 0) {
+            return NULL;    // < 0 would signify an error in comparison so return
+        }
+        if (eq_path) {  // = 1 would be true
+            Py_RETURN_TRUE;
+        }
+        Py_RETURN_FALSE;    // by default return false
+    }
+
+    // raise a not implemented error if we reach the bottom of the function
+    PyErr_SetString(PyExc_NotImplementedError, "");
+    return NULL;    // return null
+}
+
+/* 
+ * return Py_True or Py_False based on bgpsec_next_asn and bgpsec_as_path
+ * Returns True if valid by BGPSec else False
+ * equivelent to `bgpsec_valid(self, asn: int) -> bool`
+ */
+static PyObject *Announcement_bgpsec_valid(AnnouncementObject *self, PyObject *asn) {
+    // create an error message for deprication
+    const char *msg =
+        "Please call bgpsec_valid from the BGPSec class, not the Announcement. "
+        "This will be removed in a later version";
+
+    // send deptrication warning at stacklevel 2
+    if (PyErr_WarnEx(PyExc_DeprecationWarning, msg, 2) < 0) {
+        return NULL;
+    }
+
+    // compare bgpsec_next_asn == asn
+    int first = PyObject_RichCompareBool(self->bgpsec_next_asn, asn, Py_EQ);
+    if (first < 0) {
+        return NULL;    // < 0 would signify an error in comparison so return
+    }
+    if (!first) {
+        Py_RETURN_FALSE;    // = 0 would be false
+    }
+
+    // compare bgpsec_as_path == as_path
+    int second = PyObject_RichCompareBool(self->bgpsec_as_path, self->as_path, Py_EQ);
+    if (second < 0) {
+        return NULL;    // < 0 would signify an error in comparison so return
+    }
+    if (second) {
+        Py_RETURN_TRUE; // = 1 would be true
+    }
+    Py_RETURN_FALSE;    // return false by default
+}
+
+// === End of optional ===
+
 // ########################
 // # Python Functionality #
 // ########################
@@ -658,6 +813,12 @@ static PyGetSetDef Announcement_getset[] = {
 
 // create a null terminated list of methods for announcements, set propper names, set propper descriptions
 static PyMethodDef Announcement_methods[] = {
+    // === optional for yaml and testing ===
+    {"__to_yaml_dict__", (PyCFunction)Announcement_to_yaml_dict, METH_NOARGS, "yaml.dump helper"},
+    {"__from_yaml_dict__", (PyCFunction)Announcement_from_yaml_dict, METH_VARARGS | METH_KEYWORDS | METH_CLASS, "yaml.load helper"},
+    {"prefix_path_attributes_eq", (PyCFunction)Announcement_prefix_path_attributes_eq, METH_O, "Checks prefix and as path equivalency"},
+    {"bgpsec_valid", (PyCFunction)Announcement_bgpsec_valid, METH_O, "Returns True if valid by BGPSec else False"},
+    // === optional for yaml and testting ===
     {"copy", (PyCFunction)Announcement_copy, METH_VARARGS | METH_KEYWORDS, "Creates a new ann with proper sim attrs"},
     {NULL, NULL, 0, NULL}
 };
